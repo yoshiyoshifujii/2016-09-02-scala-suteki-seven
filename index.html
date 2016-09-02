@@ -1,0 +1,407 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Scalaの魅力を話してみる</title>
+
+    <link rel="stylesheet" href="/css/reveal.css">
+    <link rel="stylesheet" href="/css/theme/night.css">
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="/lib/css/zenburn.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? '/css/print/pdf.css' : '/css/print/paper.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <img src="./img/scala-logo.png" style="height:40px;position:absolute;top:0;left:0;transform:rotate(-10deg);background-color: #FFF;">
+          <h1>Scalaの魅力を<br>話してみる</h1>
+          <p>社内発表会</p>
+          <p>
+            <small>
+              2016-09-02(Fri) / <a href="https://github.com/yoshiyoshifujii">@yoshiyoshifujii</a>
+            </small>
+          </p>
+        </section>
+
+        <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+          <script type="text/template">
+# 今日のお話
+
+---
+
+Scalaをはじめて、1年3ヶ月が経ち、それなりに酸いも甘いもあれしてきたので、そろそろその辺りふまえて語ってみて、もしかしたらScalaに興味を持ってもらえて、同じチームでScalaで開発したいねんって直訴する人が出てきたりして、仲間が増えるとうれしいなーなんて狙いを持って話します。
+
+---
+
+とはいえ、私は、言語マニアではありませんので、Scalaはこんな高尚な言語だが、こっちの言語のほーがここは優れていて、といった議論を展開したいわけではなく、ただ純粋にScalaやっててここ楽しいなーっておもうあたりを紹介させていただければと思ってます。
+
+---
+
+## 魅力だと思うところ<br>(スカラステキセブン)
+
+1. sbt
+2. Akka
+3. trait
+4. Syntax Sugar
+5. 補完
+6. AWS
+7. コミュニティ
+          </script>
+        </section>
+
+        <section>
+          <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+            <script type="text/template">
+## 1/7 sbt
+
+* かなり強力なビルドツール
+
+* Simple Build Tool
+
+* ライブラリ依存性の解決
+
+* マルチプロジェクト
+
+* プラグイン
+
+---
+
+## ライブラリ依存性の解決
+
+---
+
+![libraries](./img/libraries.png)
+
+---
+
+* 一昔前は、全て手でダウンロードしてきた
+
+* ライブラリもSVNとかでバージョン管理してた
+
+* Pathを間違うと読み込まれないことがあった
+
+* 最近は、Pythonでpip、Rubyでgem、C#でnugetみたいなやつある
+
+* NodeJsならnpmとか
+
+---
+
+```scala
+// Specs2
+val specs2Core = "org.specs2" %% "specs2-core" % "3.6"
+val specs2Mock = "org.specs2" %% "specs2-mock" % "3.6"
+val specs2JUnit = "org.specs2" %% "specs2-junit" % "3.6"
+
+// Modules4Lambda
+val modulesVersion        = "0.10.0"
+val modulesLambda4Kinesis = "com.hoge" %% "modules-lambda-aws-lambda4kinesis" % modulesVersion
+val modules3             = "com.hoge" %% "modules-lambda-aws-s3" % modulesVersion
+val modulesFirehose          = "com.hoge" %% "modules-lambda-aws-firehose" % modulesVersion
+
+// spray-json
+val sprayJson = "io.spray" %%  "spray-json" % "1.3.2"
+```
+
+---
+
+* バージョンを一括りにして書ける
+
+* Scalaで書ける
+
+* 最新バージョンを自動で見分けたりできる
+
+* コンパイラーのバージョンを空気読んでやってくれる
+
+---
+
+```scala
+val anticorruptionDeps = Seq(
+  modulesLambda4Kinesis,
+  modules3,
+  modulesFirehose,
+  sprayJson,
+  specs2Core % Test,
+  specs2Mock % Test,
+  specs2JUnit % Test
+)
+
+val installedapplicationDeps = Seq(
+  specs2Core % Test,
+  specs2Mock % Test,
+  specs2JUnit % Test
+)
+```
+
+---
+
+## マルチプロジェクト
+
+---
+
+## プラグイン
+
+---
+
+## このまま続けると1時間ぐらい続くのでやめます
+
+            </script>
+          </section>
+        </section>
+
+        <section>
+          <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+            <script type="text/template">
+## 2/7 Akka
+
+* ScalaとJavaのApache2ライセンスで提供されているOSSのライブラリ
+
+* アクターモデルを適用したスケーラビルティや耐障害性に優れた並行処理が書けるライブラリ
+
+* Scalaなら並行処理が可読性高く書ける
+
+---
+
+```scala
+class CheckService(check: ActorRef)
+  extends AkkaHttpService with DefaultJsonFormats {
+
+  import akka.pattern.ask
+  import scala.concurrent.duration._
+
+  implicit val timeout = Timeout(30.seconds)
+
+  implicit val checkRequestFormat = jsonFormat2(CheckRequest)
+
+  val route =
+    postCheck
+
+  def postCheck =
+    path("check") {
+      originalHeaderExtract { header =>
+        post {
+          entity(as[CheckRequest]) { request =>
+            onSuccessEx {
+              (check ? convert2Input(header, request)).mapTo[ApiGatewayResponse]
+            }
+          }
+        }
+      }
+    }
+}
+```
+
+---
+
+```scala
+class CheckActor extends Actor with ActorLogging {
+  import CheckActor._
+
+  override def receive: Receive = {
+    case m: InputModel => {
+      val input = convert2InputStream(m)
+      val output = execute(input)(new App().handleRequest)
+      sender ! output
+    }
+  }
+}
+```
+
+            </script>
+          </section>
+        </section>
+
+        <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+          <script type="text/template">
+## 3/7 trait
+
+* Mixin
+
+* 部品化、再構成、リファクタリング、Unitテストコード
+
+* traitで書いておくと、後からどうとでもできる
+
+* 多種多様な新たなデザインパターンを生み出している
+
+* DIがシンプルに実現できる
+
+          </script>
+        </section>
+
+        <section>
+          <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+            <script type="text/template">
+## 4/7 Syntax Sugar
+
+* 糖衣構文
+
+* 自然言語かのごとくコードが書けちゃう
+
+* さだまさしコンパイラ
+
+---
+
+![sadamasashi](./img/sadamasashi.png)
+
+* http://qiita.com/seratch@github/items/3be26b584f3d74aa1150
+* https://github.com/seratch/sadamasashi-compiler
+
+            </script>
+          </section>
+        </section>
+
+        <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+          <script type="text/template">
+## 5/7 補完
+
+* IDEやREPLが充実している
+
+* IntelliJ IDEA
+
+* Eclipse
+
+* リズムの良い開発ができる
+
+---
+
+## 6/7 AWS
+
+* 相性が良い
+
+* AWS Java SDK がそのまま使える
+
+* なんなら、Scalaで扱いやすく、ラップできる
+
+* ラッパー書くのも、これまた楽しい
+
+* Scalaがあるのに、Javaでやる意味がわからん
+
+          </script>
+        </section>
+
+        <section>
+          <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+            <script type="text/template">
+## 7/7 コミュニティ
+
+* 導入企業がとがってる
+
+* Scala界隈での有名人とかいる
+
+---
+
+## 国内
+
+* ドワンゴさん
+
+* はてなさん
+
+* ChatWorkさん
+
+* エムスリーさん
+
+* SmartNewsさん
+
+* ビズリーチさん
+
+* ヌーラボさん
+
+---
+
+## 海外だと
+
+* Twitter
+
+* LinkedIn
+
+* FourSquare
+
+* Netflix
+            </script>
+          </section>
+        </section>
+
+        <section data-markdown data-separator="^\n---$" data-vertical="^\n>>>$">
+          <script type="text/template">
+
+## 国内大規模なイベント
+
+---
+
+* [ScalaMatsuri](http://2017.scalamatsuri.org/)
+
+![ScalaMatsuri.png](./img/ScalaMatsuri.png)
+
+---
+
+* [Scala福岡](http://scala.connpass.com/event/26674/)
+
+![ScalaFukuoka.png](./img/ScalaFukuoka.png)
+
+---
+
+* [Scala関西Summit](http://summit.scala-kansai.org/)
+
+![ScalaKansai.png](./img/ScalaKansai.png)
+
+---
+
+# ということで…
+
+---
+
+# 2016年10月08日 (土)
+
+---
+
+# 大阪産業創造館にて
+
+---
+
+# Scala 関西 Summit 2016<br>あります!!
+
+---
+
+# エントリーは<br> [こちら](http://skug.connpass.com/event/38349/) !!
+
+http://skug.connpass.com/event/38349/
+
+---
+
+# 以上です。
+          </script>
+        </section>
+      </div>
+    </div>
+
+    <script src="/lib/js/head.min.js"></script>
+    <script src="/js/reveal.js"></script>
+
+    <script>
+      // More info https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        history: true,
+
+        // More info https://github.com/hakimel/reveal.js#dependencies
+        dependencies: [
+          { src: '/plugin/markdown/marked.js' },
+          { src: '/plugin/markdown/markdown.js' },
+          { src: '/plugin/notes/notes.js', async: true },
+          { src: '/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+        ],
+        slideNumber: 'c/t'
+      });
+    </script>
+  </body>
+</html>
